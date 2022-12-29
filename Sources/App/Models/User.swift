@@ -22,6 +22,9 @@ final class User: Model, Content {
 
     @Field(key: "password_hash")
     var passwordHash: String
+    
+    @OptionalChild(for: \.$user)
+    var stravaToken: StravaToken?
 
     init() { }
 
@@ -50,3 +53,5 @@ extension User {
         )
     }
 }
+
+extension User: ModelSessionAuthenticatable, ModelCredentialsAuthenticatable {}

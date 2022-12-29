@@ -1,5 +1,7 @@
 import Fluent
 import FluentPostgresDriver
+import Leaf
+import Redis
 import Vapor
 
 // configures your application
@@ -14,9 +16,18 @@ public func configure(_ app: Application) throws {
         password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
         database: Environment.get("DATABASE_NAME") ?? "vapor_database"
     ), as: .psql)
+    
+    app.views.use(.leaf)
+    
+    let redisHostname = Environment.get("REDIS_HOSTNAME") ?? "localhost"
+    let redisConfig = try RedisConfiguration(hostname: redisHostname)
+    app.redis.configuration = redisConfig
+    app.sessions.use(.redis)
+    app.middleware.use(app.sessions.middleware)
 
     app.migrations.add(User.Migration())
     app.migrations.add(UserToken.Migration())
+    app.migrations.add(StravaToken.Migration())
 
     // register routes
     try routes(app)

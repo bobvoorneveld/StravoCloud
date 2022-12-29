@@ -30,13 +30,39 @@ struct UserController: RouteCollection {
         let users = routes.grouped("users")
         users.post(use: create)
         users.post("basic", use: basic)
-
-        let passwordProtected = users.grouped(User.authenticator())
-        passwordProtected.post("login", use: login)
         
+        let passwordProtected = users.grouped(User.authenticator())
+        passwordProtected.post("token/login", use: tokenLogin)
+        
+        let authSessionsRoutes = users.grouped(User.sessionAuthenticator())
+        authSessionsRoutes.get("login", use: loginHandler)
+        authSessionsRoutes.get("logout", use: logoutHandler)
+
+        let credentialsAuthRoutes = authSessionsRoutes.grouped(User.credentialsAuthenticator())
+        credentialsAuthRoutes.post("login", use: loginPostHandler)
+
         let tokenProtected = users.grouped(UserToken.authenticator())
         tokenProtected.get("me", use: me)
     }
+    
+    func loginHandler(_ req: Request) -> EventLoopFuture<View> {
+        return req.view.render("User/login")
+    }
+
+    func loginPostHandler(_ req: Request) async throws -> Response {
+        if req.auth.has(User.self) {
+            return req.redirect(to: "/")
+        }
+        return try await req.view
+            .render("User/login", ["loginError": true])
+            .encodeResponse(for: req)
+    }
+
+    func logoutHandler(_ req: Request) -> Response {
+        req.auth.logout(User.self)
+        return req.redirect(to: "/")
+    }
+
     
     func me(req: Request) async throws -> User {
         try req.auth.require(User.self)
@@ -57,7 +83,7 @@ struct UserController: RouteCollection {
         return user
     }
     
-    func login(req: Request) async throws -> UserToken {
+    func tokenLogin(req: Request) async throws -> UserToken {
         let user = try req.auth.require(User.self)
         let token = try user.generateToken()
         try await token.save(on: req.db)
