@@ -1,5 +1,6 @@
 import Fluent
 import FluentPostgresDriver
+import FluentPostGIS
 import Leaf
 import Redis
 import Vapor
@@ -28,6 +29,8 @@ public func configure(_ app: Application) throws {
     app.migrations.add(User.Migration())
     app.migrations.add(UserToken.Migration())
     app.migrations.add(StravaToken.Migration())
+    
+    app.migrations.add(EnablePostGISMigration())
 
     // register routes
     try routes(app)

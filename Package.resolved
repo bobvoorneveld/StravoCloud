@@ -46,6 +46,15 @@
       }
     },
     {
+      "identity" : "fluent-postgis",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/brokenhandsio/fluent-postgis.git",
+      "state" : {
+        "revision" : "ea14dfc2ca5029f98513a96dfd46c3527395af99",
+        "version" : "0.3.0"
+      }
+    },
+    {
       "identity" : "fluent-postgres-driver",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/fluent-postgres-driver.git",
@@ -268,6 +277,15 @@
       "state" : {
         "revision" : "2d9d2188a08eef4a869d368daab21b3c08510991",
         "version" : "2.6.1"
+      }
+    },
+    {
+      "identity" : "wkcodable",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/rabc/WKCodable.git",
+      "state" : {
+        "revision" : "49540ce3602cb9f66bdaac761d38ba901d27d0be",
+        "version" : "0.1.2"
       }
     }
   ],
