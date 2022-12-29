@@ -15,6 +15,8 @@ struct StravaController: RouteCollection {
         let sessionAuth = strava.grouped([User.sessionAuthenticator(), User.redirectMiddleware(path: "/users/login")])
         sessionAuth.get("authenticate", use: authenticate)
         sessionAuth.get("exchange_token", use: exchangeToken)
+
+        sessionAuth.get("sync", use: sync)
     }
 
     func authenticate(req: Request) async throws -> Response {
@@ -31,6 +33,14 @@ struct StravaController: RouteCollection {
         try await token.renewToken(req: req)
         
         return try await user.stravaToken!.encodeResponse(for: req)
+    }
+    
+    func sync(req: Request) async throws -> Response {
+        guard let _ = try await req.auth.require(User.self).$stravaToken.get(on: req.db) else {
+            return req.redirect(to: "/strava/authenticate")
+        }
+        let activities = try await loadActivities(req: req)
+        return try await activities.encodeResponse(for: req)
     }
     
     struct Token: Content {

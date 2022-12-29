@@ -6,12 +6,14 @@
 //
 
 import Fluent
+import Vapor
 
-final class Pet: Fields {
+
+final class LatLng: Fields {
     @Field(key: "lat")
     var lat: Double
 
-    @Field(key: "long")
+    @Field(key: "lng")
     var lng: Double
 
     init() { }
@@ -38,20 +40,17 @@ final class StravaActivity: Model, Content {
     
     @Field(key: "start_date")
     var startDate: Date
-    
-    @Field(key: "refresh_token")
-    var refreshToken: String
 
     @Parent(key: "user_id")
     var user: User
 
     init() { }
 
-    init(id: UUID? = nil, refreshToken: String, accessToken: String? = nil, expiresAt: Date? = nil, userID: User.IDValue) {
+    init(id: UUID? = nil, stravaID: Int, name: String, startDate: Date, userID: User.IDValue) {
         self.id = id
-        self.refreshToken = refreshToken
-        self.accessToken = accessToken
-        self.expiresAt = expiresAt
+        self.stravaID = stravaID
+        self.name = name
+        self.startDate = startDate
         self.$user.id = userID
     }
 }
