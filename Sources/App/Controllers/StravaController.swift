@@ -16,16 +16,11 @@ struct StravaController: RouteCollection {
         sessionAuth.get("authenticate", use: authenticate)
         sessionAuth.get("exchange_token", use: exchangeToken)
     }
-    
-    struct NewAccessTokenResponse: Content {
-        let accessToken: String
-        let expiresAt: TimeInterval
-    }
 
     func authenticate(req: Request) async throws -> Response {
         let user = try req.auth.require(User.self)
 
-        guard let clientID = Environment.get("STRAVA_CLIENT_ID"), let clientSecret = Environment.get("STRAVA_CLIENT_SECRET") else {
+        guard let clientID = Environment.get("STRAVA_CLIENT_ID") else {
             throw Abort(.preconditionFailed)
         }
 
@@ -33,18 +28,7 @@ struct StravaController: RouteCollection {
             return req.redirect(to: "https://www.strava.com/oauth/authorize?client_id=\(clientID)&response_type=code&redirect_uri=http://localhost:8080/strava/exchange_token&approval_prompt=force&scope=read_all,profile:read_all,activity:read_all")
         }
         
-        if let expires = token.expiresAt, expires < Date() {
-            let res = try await req.client.post("https://www.strava.com/oauth/token?client_id=\(clientID)&client_secret=\(clientSecret)&grant_type=refresh_token&refresh_token=\(token.refreshToken)")
-            
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            
-            let newToken = try res.content.decode(NewAccessTokenResponse.self, using: decoder)
-            
-            token.accessToken = newToken.accessToken
-            token.expiresAt = Date(timeIntervalSince1970: newToken.expiresAt)
-            try await token.update(on: req.db)
-        }
+        try await token.renewToken(req: req)
         
         return try await user.stravaToken!.encodeResponse(for: req)
     }
@@ -52,41 +36,11 @@ struct StravaController: RouteCollection {
     struct Token: Content {
         let code: String
     }
-    
     struct StravaTokenResponse: Content {
-        let tokenType: String?
         let expiresAt: TimeInterval
-        let expiresIn: Int
         let refreshToken: String
         let accessToken: String
-        let athlete: Athlete
     }
-
-    // MARK: - Athlete
-    struct Athlete: Content {
-        let id: Int
-        let username: String
-        let resourceState: Int
-        let firstname: String
-        let lastname: String
-        let bio: String
-        let city: String
-        let state: String
-        let country: String
-        let sex: String
-        let premium: Bool
-        let summit: Bool
-        let createdAt: Date
-        let updatedAt: Date
-        let badgeTypeId: Int
-        let weight: Double
-        let profileMedium: String
-        let profile: String
-        let friend: Int?
-        let follower: Int?
-    }
-
-    
     func exchangeToken(req: Request) async throws -> StravaToken {
         let token = try req.query.decode(Token.self)
         let user = try req.auth.require(User.self)
