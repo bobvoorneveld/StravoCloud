@@ -16,7 +16,7 @@ extension StravaToken {
                 .id()
                 .field("refresh_token", .string, .required)
                 .field("access_token", .string)
-                .field("expires_at", .date)
+                .field("expires_at", .datetime)
                 .field("user_id", .uuid, .required, .references("users", "id"))
                 .create()
         }

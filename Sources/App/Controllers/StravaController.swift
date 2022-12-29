@@ -17,13 +17,36 @@ struct StravaController: RouteCollection {
         sessionAuth.get("exchange_token", use: exchangeToken)
     }
     
+    struct NewAccessTokenResponse: Content {
+        let accessToken: String
+        let expiresAt: TimeInterval
+    }
+
     func authenticate(req: Request) async throws -> Response {
-        
-        guard let clientID = Environment.get("STRAVA_CLIENT_ID") else {
+        let user = try req.auth.require(User.self)
+
+        guard let clientID = Environment.get("STRAVA_CLIENT_ID"), let clientSecret = Environment.get("STRAVA_CLIENT_SECRET") else {
             throw Abort(.preconditionFailed)
         }
 
-        return req.redirect(to: "http://www.strava.com/oauth/authorize?client_id=\(clientID)&response_type=code&redirect_uri=http://localhost:8080/strava/exchange_token&approval_prompt=force&scope=read_all,profile:read_all,activity:read_all")
+        guard let token = try await user.$stravaToken.get(on: req.db) else {
+            return req.redirect(to: "https://www.strava.com/oauth/authorize?client_id=\(clientID)&response_type=code&redirect_uri=http://localhost:8080/strava/exchange_token&approval_prompt=force&scope=read_all,profile:read_all,activity:read_all")
+        }
+        
+        if let expires = token.expiresAt, expires < Date() {
+            let res = try await req.client.post("https://www.strava.com/oauth/token?client_id=\(clientID)&client_secret=\(clientSecret)&grant_type=refresh_token&refresh_token=\(token.refreshToken)")
+            
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            
+            let newToken = try res.content.decode(NewAccessTokenResponse.self, using: decoder)
+            
+            token.accessToken = newToken.accessToken
+            token.expiresAt = Date(timeIntervalSince1970: newToken.expiresAt)
+            try await token.update(on: req.db)
+        }
+        
+        return try await user.stravaToken!.encodeResponse(for: req)
     }
     
     struct Token: Content {
