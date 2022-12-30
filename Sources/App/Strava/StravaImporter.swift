@@ -12,6 +12,10 @@ enum StravaError: Error {
 
 func loadActivities(req: Request) async throws -> [StravaActivity] {
     let user = try req.auth.require(User.self)
+    
+    let lastRideStartDate = try await user.$activities.query(on: req.db).sort(\.$startDate, .descending).first()?.startDate
+
+    req.logger.info("Last start date? \(lastRideStartDate)")
 
     guard let accessToken = try await user.stravaToken?.getAccessToken(req: req) else {
         throw StravaError.invalidToken
@@ -22,10 +26,14 @@ func loadActivities(req: Request) async throws -> [StravaActivity] {
     while true {
         req.logger.info("Loading page: \(page)")
         let response = try await req.client.get("https://www.strava.com/api/v3/athlete/activities") { req in
-            try req.query.encode([
+            var query = [
                 "page": "\(page)",
                 "per_page": "30"
-            ])
+            ]
+            if let date = lastRideStartDate {
+                query["after"] = "\(Int(date.timeIntervalSince1970) - 10)"
+            }
+            try req.query.encode(query)
             req.headers.bearerAuthorization = BearerAuthorization(token: accessToken)
         }
         

@@ -25,6 +25,9 @@ final class User: Model, Content {
     
     @OptionalChild(for: \.$user)
     var stravaToken: StravaToken?
+    
+    @Children(for: \.$user)
+    var activities: [StravaActivity]
 
     init() { }
 
