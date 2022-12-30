@@ -17,6 +17,25 @@ struct StravaController: RouteCollection {
         sessionAuth.get("exchange_token", use: exchangeToken)
 
         sessionAuth.get("sync", use: sync)
+        sessionAuth.get(":activityID", use: activity)
+    }
+    
+    struct GetGemeente: Content {
+        var id: Int
+        var name: String
+    }
+    func activity(req: Request) async throws -> [GetGemeente] {
+        let user = try req.auth.require(User.self)
+        guard let id: UUID = req.parameters.get("activityID") else {
+            throw Abort(.badRequest)
+        }
+        guard let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, id).first() else {
+            throw Abort(.notFound)
+        }
+        
+        let gemeentes = try await Gemeente.query(on: req.db).filterGeometryIntersects(\.$geom2, activity.summaryLine).all()
+        
+        return gemeentes.map { GetGemeente(id: $0.id!, name: $0.naam) }
     }
 
     func authenticate(req: Request) async throws -> Response {
