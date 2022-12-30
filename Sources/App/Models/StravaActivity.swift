@@ -99,7 +99,7 @@ final class StravaActivity: Model, Content {
     var summaryPolyline: String
     
     @Field(key: "map_summary_line")
-    var summaryLine: GeographicLineString2D
+    var summaryLine: GeometricLineString2D
 
     @Field(key: "trainer")
     var trainer: Bool
@@ -123,10 +123,10 @@ final class StravaActivity: Model, Content {
     var gearID: String?
     
     @Field(key: "start_location")
-    var startLocation: GeographicPoint2D
+    var startLocation: GeometricPoint2D
     
     @Field(key: "end_location")
-    var endLocation: GeographicPoint2D
+    var endLocation: GeometricPoint2D
     
     @Field(key: "average_speed")
     var averageSpeed: Double
@@ -227,8 +227,8 @@ final class StravaActivity: Model, Content {
         self.summaryPolyline = activity.map.summaryPolyline
 
         let coordinates = Polyline(encodedPolyline: activity.map.summaryPolyline).coordinates!
-        let points = coordinates.map { GeographicPoint2D(longitude: $0.longitude, latitude: $0.latitude) }
-        let linestring = GeographicLineString2D(points: points)
+        let points = coordinates.map { GeometricPoint2D(x: $0.longitude, y: $0.latitude) }
+        let linestring = GeometricLineString2D(points: points)
         self.summaryLine = linestring
 
         self.trainer = activity.trainer
@@ -238,8 +238,8 @@ final class StravaActivity: Model, Content {
         self.visibility = activity.visibility
         self.flagged = activity.flagged
         self.gearID = activity.gearId
-        self.startLocation = GeographicPoint2D(longitude: activity.startLatlng[1], latitude: activity.startLatlng[0])
-        self.endLocation = GeographicPoint2D(longitude: activity.endLatlng[1], latitude: activity.endLatlng[0])
+        self.startLocation = GeometricPoint2D(x: activity.startLatlng[1], y: activity.startLatlng[0])
+        self.endLocation = GeometricPoint2D(x: activity.endLatlng[1], y: activity.endLatlng[0])
         self.averageSpeed = activity.averageSpeed
         self.maxSpeed = activity.maxSpeed
         self.averageCadence = activity.averageCadence
