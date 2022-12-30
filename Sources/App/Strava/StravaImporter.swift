@@ -15,7 +15,11 @@ func loadActivities(req: Request) async throws -> [StravaActivity] {
     
     let lastRideStartDate = try await user.$activities.query(on: req.db).sort(\.$startDate, .descending).first()?.startDate
 
-    req.logger.info("Last start date? \(lastRideStartDate)")
+    if let lastRideStartDate {
+        req.logger.info("Last start date? \(lastRideStartDate)")
+    } else {
+        req.logger.info("No sync before, loading all")
+    }
 
     guard let accessToken = try await user.stravaToken?.getAccessToken(req: req) else {
         throw StravaError.invalidToken
@@ -61,5 +65,5 @@ func loadActivities(req: Request) async throws -> [StravaActivity] {
 
     try await stravaActivities.create(on: req.db)
     
-    return stravaActivities
+    return try await user.$activities.get(reload: true, on: req.db)
 }
