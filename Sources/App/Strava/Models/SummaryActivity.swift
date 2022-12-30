@@ -11,7 +11,7 @@ import Vapor
 struct SummaryActivity: Content {
     let athlete: Athlete
     let name: String
-    let distance: Decimal
+    let distance: Double
     let movingTime: Int
     let elapsedTime: Int
     let totalElevationGain: Int
@@ -38,24 +38,24 @@ struct SummaryActivity: Content {
     let visibility: String
     let flagged: Bool
     let gearId: String
-    let startLatlng: [Decimal]
-    let endLatlng: [Decimal]
-    let averageSpeed: Decimal
-    let maxSpeed: Decimal
-    let averageCadence: Decimal
+    let startLatlng: [Double]
+    let endLatlng: [Double]
+    let averageSpeed: Double
+    let maxSpeed: Double
+    let averageCadence: Double?
     let averageTemp: Int?
-    let averageWatts: Decimal
-    let maxWatts: Int
-    let weightedAverageWatts: Int
-    let kilojoules: Decimal
+    let averageWatts: Double?
+    let maxWatts: Int?
+    let weightedAverageWatts: Int?
+    let kilojoules: Double?
     let deviceWatts: Bool
     let hasHeartrate: Bool
-    let averageHeartrate: Decimal
-    let maxHeartrate: Decimal
+    let averageHeartrate: Double?
+    let maxHeartrate: Double?
     let heartrateOptOut: Bool
     let displayHideHeartrateOption: Bool
-    let elevHigh: Decimal
-    let elevLow: Decimal
+    let elevHigh: Double
+    let elevLow: Double
     let uploadId: Int
     let uploadIdStr: String
     let externalId: String

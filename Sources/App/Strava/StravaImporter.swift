@@ -10,7 +10,7 @@ enum StravaError: Error {
     case invalidToken
 }
 
-func loadActivities(req: Request) async throws -> [SummaryActivity] {
+func loadActivities(req: Request) async throws -> [StravaActivity] {
     let user = try req.auth.require(User.self)
 
     guard let accessToken = try await user.stravaToken?.getAccessToken(req: req) else {
@@ -30,5 +30,9 @@ func loadActivities(req: Request) async throws -> [SummaryActivity] {
     decoder.dateDecodingStrategy = .iso8601
     let activities = try response.content.decode([SummaryActivity].self, using: decoder)
     
-    return activities
+    let stravaActivities = activities.map { StravaActivity(activity: $0, userID: user.id!) }
+    
+    try await stravaActivities.create(on: req.db)
+    
+    return stravaActivities
 }

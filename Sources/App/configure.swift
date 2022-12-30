@@ -32,6 +32,8 @@ public func configure(_ app: Application) throws {
     
     app.migrations.add(EnablePostGISMigration())
 
+    app.migrations.add(StravaActivity.Migration())
+
     // register routes
     try routes(app)
 }
