@@ -14,7 +14,7 @@ struct SummaryActivity: Content {
     let distance: Double
     let movingTime: Int
     let elapsedTime: Int
-    let totalElevationGain: Int
+    let totalElevationGain: Double
     let sportType: SportType?
     let workoutType: Int?
     let id: Int
@@ -37,7 +37,7 @@ struct SummaryActivity: Content {
     let `private`: Bool
     let visibility: String
     let flagged: Bool
-    let gearId: String
+    let gearId: String?
     let startLatlng: [Double]
     let endLatlng: [Double]
     let averageSpeed: Double
@@ -48,7 +48,7 @@ struct SummaryActivity: Content {
     let maxWatts: Int?
     let weightedAverageWatts: Int?
     let kilojoules: Double?
-    let deviceWatts: Bool
+    let deviceWatts: Bool?
     let hasHeartrate: Bool
     let averageHeartrate: Double?
     let maxHeartrate: Double?
@@ -63,7 +63,7 @@ struct SummaryActivity: Content {
     let prCount: Int
     let totalPhotoCount: Int
     let hasKudoed: Bool
-    let sufferScore: Int
+    let sufferScore: Int?
 }
 
 // MARK: - Athlete

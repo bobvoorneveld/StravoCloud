@@ -57,7 +57,7 @@ final class StravaActivity: Model, Content {
     var elapsedTime: Int
     
     @Field(key: "total_elevation_gain")
-    var totalElevationGain: Int
+    var totalElevationGain: Double
     
     @Field(key: "sport_type")
     var sportType: String
@@ -120,7 +120,7 @@ final class StravaActivity: Model, Content {
     var flagged: Bool
     
     @Field(key: "gear_id")
-    var gearID: String
+    var gearID: String?
     
     @Field(key: "start_location")
     var startLocation: GeographicPoint2D
@@ -198,7 +198,7 @@ final class StravaActivity: Model, Content {
     var hasKudoed: Bool
     
     @Field(key: "suffer_score")
-    var sufferScore: Int
+    var sufferScore: Int?
 
     init() { }
 
@@ -248,7 +248,7 @@ final class StravaActivity: Model, Content {
         self.maxWatts = activity.maxWatts
         self.weightedAverageWatts = activity.weightedAverageWatts
         self.kilojoules = activity.kilojoules
-        self.deviceWatts = activity.deviceWatts
+        self.deviceWatts = activity.deviceWatts ?? false
         self.hasHeartrate = activity.hasHeartrate
         self.averageHeartrate = activity.averageHeartrate
         self.maxHeartrate = activity.maxHeartrate

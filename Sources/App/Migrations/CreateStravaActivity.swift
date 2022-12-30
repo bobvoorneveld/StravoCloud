@@ -23,7 +23,7 @@ extension StravaActivity {
                 .field("distance", .double, .required)
                 .field("moving_time", .int, .required)
                 .field("elapsed_time", .int, .required)
-                .field("total_elevation_gain", .int, .required)
+                .field("total_elevation_gain", .double, .required)
                 .field("sport_type", .string, .required)
                 .field("workout_type", .int)
                 .field("start_date", .datetime, .required)
@@ -46,7 +46,7 @@ extension StravaActivity {
                 .field("private", .bool, .required)
                 .field("visibility", .string, .required)
                 .field("flagged", .bool, .required)
-                .field("gear_id", .string, .required)
+                .field("gear_id", .string)
                 .field("start_location", .geographicPoint2D, .required)
                 .field("end_location", .geographicPoint2D, .required)
                 .field("average_speed", .double, .required)
@@ -72,7 +72,7 @@ extension StravaActivity {
                 .field("pr_count", .int, .required)
                 .field("total_photo_count", .int, .required)
                 .field("has_kudoed", .bool, .required)
-                .field("suffer_score", .int, .required)
+                .field("suffer_score", .int)
                 .create()
         }
 
