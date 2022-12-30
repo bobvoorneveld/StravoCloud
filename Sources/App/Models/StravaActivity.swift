@@ -10,6 +10,7 @@ import Vapor
 import FluentPostGIS
 
 import Polyline
+import GeoJSON
 
 
 final class Location: Fields {
@@ -266,5 +267,24 @@ final class StravaActivity: Model, Content {
         self.sufferScore = activity.sufferScore
         
         self.$user.id = userID
+    }
+}
+
+extension StravaActivity {
+    var feature: Feature {
+        Feature(geometry:
+                .lineString(
+                    try! .init(coordinates:
+                            summaryLine.points.map {
+                                .init(longitude: $0.x, latitude: $0.y)
+                            }
+                         )
+                ), properties: [
+                    "name": "\(name)",
+                    "stroke": "#f60909",
+                    "stroke-width": 2,
+                    "stroke-opacity": 1
+                ]
+        )
     }
 }

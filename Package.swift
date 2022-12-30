@@ -16,6 +16,7 @@ let package = Package(
         .package(url: "https://github.com/vapor/redis", from: "4.2.0"),
         
         .package(url: "https://github.com/raphaelmor/Polyline.git", from: "5.0.2"),
+        .package(url: "https://github.com/kiliankoe/GeoJSON.git", from: "0.6.1"),
     ],
     targets: [
         .target(
@@ -28,6 +29,7 @@ let package = Package(
                 .product(name: "Redis", package: "redis"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Polyline", package: "Polyline"),
+                .product(name: "GeoJSON", package: "GeoJSON"),
                 
             ],
             swiftSettings: [

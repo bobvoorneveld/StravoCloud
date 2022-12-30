@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "anycodable",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/flight-school/AnyCodable.git",
+      "state" : {
+        "revision" : "862808b2070cd908cb04f9aafe7de83d35f81b05",
+        "version" : "0.6.7"
+      }
+    },
+    {
       "identity" : "async-http-client",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/async-http-client.git",
@@ -61,6 +70,15 @@
       "state" : {
         "revision" : "4808c539f08306ae6002f6106813a9350baa141b",
         "version" : "2.5.0"
+      }
+    },
+    {
+      "identity" : "geojson",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kiliankoe/GeoJSON.git",
+      "state" : {
+        "revision" : "c984459c86b8f5ce583da65278ae901f250804f6",
+        "version" : "0.6.1"
       }
     },
     {
