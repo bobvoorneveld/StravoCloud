@@ -19,14 +19,10 @@ struct StravaController: RouteCollection {
         sessionAuth.get("exchange_token", use: exchangeToken)
 
         sessionAuth.get("sync", use: sync)
-        sessionAuth.get(":activityID", use: activity)
+        sessionAuth.get("activities", use: activities)
+        sessionAuth.get("activities/:activityID", use: activity)
     }
     
-    struct GetGemeente: Content {
-        var id: Int
-        var name: String
-        var feature: Feature
-    }
     func activity(req: Request) async throws -> FeatureCollection {
         let user = try req.auth.require(User.self)
         guard let id: UUID = req.parameters.get("activityID") else {
@@ -40,6 +36,25 @@ struct StravaController: RouteCollection {
         return FeatureCollection(features: gemeentes.map { $0.feature } + [activity.feature])
     }
 
+    func activities(req: Request) async throws -> FeatureCollection {
+        let user = try req.auth.require(User.self)
+        
+        let activities = try await user.$activities.query(on: req.db).all()
+        var features = [Feature]()
+        
+        var gemeenteFeatures = Set<Feature>()
+        
+        for activity in activities {
+            let gemeentes = try await Gemeente.query(on: req.db).filterGeometryIntersects(\.$geom2, activity.summaryLine).all()
+            if !gemeentes.isEmpty {
+                gemeenteFeatures.formUnion(gemeentes.map { $0.feature })
+                features.append(activity.feature)
+            }
+        }
+        
+        return FeatureCollection(features: features + gemeenteFeatures)
+    }
+    
     func authenticate(req: Request) async throws -> Response {
         let user = try req.auth.require(User.self)
 
@@ -90,5 +105,11 @@ struct StravaController: RouteCollection {
         let stravaToken = StravaToken(refreshToken: tokenData.refreshToken, accessToken: tokenData.accessToken, expiresAt: Date(timeIntervalSince1970: tokenData.expiresAt), userID: user.id!)
         try await stravaToken.create(on: req.db)
         return stravaToken
+    }
+}
+
+extension Feature: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }

@@ -38,7 +38,7 @@ extension Gemeente {
             return try? Polygon(coordinates: positions)
         }
         let multi = MultiPolygon(coordinates: polygons)
-        return Feature(geometry: .multiPolygon(multi), properties: ["name": "\(naam)"])
+        return Feature(geometry: .multiPolygon(multi), id: "\(naam)", properties: ["name": "\(naam)"])
     }
 }
 

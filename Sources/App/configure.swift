@@ -34,7 +34,8 @@ public func configure(_ app: Application) throws {
 
     app.migrations.add(StravaActivity.Migration())
 
-    app.logger.logLevel = .debug
+//    app.logger.logLevel = .debug
+    app.http.server.configuration.responseCompression = .enabled
 
     // register routes
     try routes(app)
