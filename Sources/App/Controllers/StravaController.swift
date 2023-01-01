@@ -37,7 +37,8 @@ struct StravaController: RouteCollection {
         }
         
         let gemeentes = try await Gemeente.query(on: req.db).filterGeometryIntersects(\.$geom2, activity.summaryLine).all()
-        return FeatureCollection(features: gemeentes.map { $0.feature } + [activity.feature])
+        try await activity.getTiles(on: req.db)
+        return FeatureCollection(features: gemeentes.map { $0.feature } + activity.features)
     }
 
     func activities(req: Request) async throws -> FeatureCollection {
@@ -59,66 +60,21 @@ struct StravaController: RouteCollection {
         return FeatureCollection(features: features + gemeenteFeatures)
     }
     
-    struct Tile: Content {
+    struct GetTile: Content {
         let x: Int
         let y: Int
         let z: Int
-        
-        let url: String?
+        let url: String
     }
-    func tiles(req: Request) async throws -> [ActivityTile] {
+    func tiles(req: Request) async throws -> [GetTile] {
         let user = try req.auth.require(User.self)
         
-        guard let sql = req.db as? SQLDatabase, let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+        guard let activityId = req.parameters.get("activityID", as: UUID.self),
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).with(\.$tiles).first() else {
             throw Abort(.notFound)
         }
         
-        // 24d2e128-3ef4-411c-9453-99acf67ae670
-        var tiles = try await sql.raw("""
-WITH
-  -- parameter injection, for convenience
-  zoom(lvl, csize) AS (
-    VALUES ( 14, (2*PI()*6378137)/POW(2, 14) )
-  ),
-
-  -- subdivide your polygons to minimize per-geometry vertex count
-  poi AS (
-    SELECT
-      id, sdv AS geom
-    FROM
-      strava_activities AS ply,
-      LATERAL ST_SubDivide(
-        ST_Transform(ply.map_summary_line, 3857),
-        64
-      ) AS sdv
-      WHERE id='\(activityId.uuidString)'
-  )
-
--- get all covering tile indices for each POI
-SELECT DISTINCT
-  grid.i as x, grid.j as y, z.lvl as z
-FROM
-  zoom as z,
-  poi AS t,
-  LATERAL ST_SquareGrid(z.csize, t.geom) AS grid
-
--- filter for those that actually intersect any of the subdivisions
-WHERE
-  ST_Intersects(t.geom, grid.geom)
-;
-""").all(decoding: Tile.self)
-        
-        tiles = tiles.map {
-            let x = $0.x + 8192
-            let y = 8192 - $0.y
-            return Tile(x: x, y: y, z: $0.z, url: "https://tile.openstreetmap.org/\($0.z)/\(x)/\(y).png")
-        }
-        
-        try await tiles.map { ActivityTile(activityID: activityId, x: $0.x, y: $0.y, z: $0.z) }.create(on: req.db)
-        try await activity.$tiles.load(on: req.db)
-        
-        return activity.tiles
+        return try await activity.getTiles(on: req.db).map { .init(x: $0.x, y: $0.y, z: $0.z, url: $0.url) }
     }
     
     func authenticate(req: Request) async throws -> Response {

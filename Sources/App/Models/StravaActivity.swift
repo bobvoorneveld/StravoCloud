@@ -290,4 +290,12 @@ extension StravaActivity {
                 ]
         )
     }
+    
+    var tileFeatures: [Feature] {
+        tiles.map { $0.feature }
+    }
+    
+    var features: [Feature] {
+        tileFeatures + [feature]
+    }
 }

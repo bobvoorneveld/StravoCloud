@@ -26,6 +26,10 @@ final class ActivityTile: Model, Content {
     @Field(key: "z")
     var z: Int
     
+    var url: String {
+        "https://tile.openstreetmap.org/\(z)/\(x)/\(y).png"
+    }
+
     init() { }
 
     init(activityID: UUID, x: Int, y: Int, z: Int) {
