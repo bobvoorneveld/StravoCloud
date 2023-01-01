@@ -200,6 +200,9 @@ final class StravaActivity: Model, Content {
     
     @Field(key: "suffer_score")
     var sufferScore: Int?
+    
+    @Children(for: \.$activity)
+    var tiles: [ActivityTile]
 
     init() { }
 

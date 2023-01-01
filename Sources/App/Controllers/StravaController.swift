@@ -66,11 +66,11 @@ struct StravaController: RouteCollection {
         
         let url: String?
     }
-    func tiles(req: Request) async throws -> [Tile] {
+    func tiles(req: Request) async throws -> [ActivityTile] {
         let user = try req.auth.require(User.self)
         
         guard let sql = req.db as? SQLDatabase, let activityId = req.parameters.get("activityID", as: UUID.self),
-              let _ = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
             throw Abort(.notFound)
         }
         
@@ -114,7 +114,11 @@ WHERE
             let y = 8192 - $0.y
             return Tile(x: x, y: y, z: $0.z, url: "https://tile.openstreetmap.org/\($0.z)/\(x)/\(y).png")
         }
-        return tiles
+        
+        try await tiles.map { ActivityTile(activityID: activityId, x: $0.x, y: $0.y, z: $0.z) }.create(on: req.db)
+        try await activity.$tiles.load(on: req.db)
+        
+        return activity.tiles
     }
     
     func authenticate(req: Request) async throws -> Response {
