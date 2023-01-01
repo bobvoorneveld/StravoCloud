@@ -10,6 +10,7 @@ enum StravaError: Error {
     case invalidToken
 }
 
+@discardableResult
 func loadActivities(req: Request) async throws -> [StravaActivity] {
     let user = try req.auth.require(User.self)
     

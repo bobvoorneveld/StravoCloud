@@ -25,9 +25,10 @@ struct StravaController: RouteCollection {
         let activityRoute = activitiesRoutes.grouped(":activityID")
         activityRoute.get(use: activity)
         activityRoute.get("tiles", use: tiles)
+        activityRoute.get("feature-collection", use: featureCollection)
     }
     
-    func activity(req: Request) async throws -> FeatureCollection {
+    func activity(req: Request) async throws -> StravaActivity {
         let user = try req.auth.require(User.self)
         guard let id: UUID = req.parameters.get("activityID") else {
             throw Abort(.badRequest)
@@ -36,28 +37,49 @@ struct StravaController: RouteCollection {
             throw Abort(.notFound)
         }
         
-        let gemeentes = try await Gemeente.query(on: req.db).filterGeometryIntersects(\.$geom2, activity.summaryLine).all()
-        try await activity.getTiles(on: req.db)
-        return FeatureCollection(features: gemeentes.map { $0.feature } + activity.features)
+        return activity
     }
 
-    func activities(req: Request) async throws -> FeatureCollection {
+    struct GetAllActivity: Content {
+        let id: UUID
+        let name: String
+        let startDate: Date
+        let distance: Double
+        let averageSpeed: Double
+        let averageWatts: Double?
+        let movingTime: TimeInterval
+        let weightedAverageWatts: Int?
+        let averageCadence: Double?
+        let elapsedTime: TimeInterval
+        let totalElevationGain: Double
+        let kilojoules: Double?
+        let sufferScore: Int?
+        let url: URL
+    }
+    func activities(req: Request) async throws -> [GetAllActivity] {
         let user = try req.auth.require(User.self)
         
-        let activities = try await user.$activities.query(on: req.db).all()
-        var features = [Feature]()
-        
-        var gemeenteFeatures = Set<Feature>()
-        
-        for activity in activities {
-            let gemeentes = try await Gemeente.query(on: req.db).filterGeometryIntersects(\.$geom2, activity.summaryLine).all()
-            if !gemeentes.isEmpty {
-                gemeenteFeatures.formUnion(gemeentes.map { $0.feature })
-                features.append(activity.feature)
-            }
+        return try await user.$activities.query(on: req.db)
+            .sort(\.$startDate, .descending)
+            .all()
+            .compactMap { a in
+                GetAllActivity(
+                    id: a.id!,
+                    name: a.name,
+                    startDate: a.startDate,
+                    distance: a.distance,
+                    averageSpeed: a.averageSpeed,
+                    averageWatts: a.averageWatts,
+                    movingTime: TimeInterval(a.movingTime),
+                    weightedAverageWatts: a.weightedAverageWatts,
+                    averageCadence: a.averageCadence,
+                    elapsedTime: TimeInterval(a.elapsedTime),
+                    totalElevationGain: a.totalElevationGain,
+                    kilojoules: a.kilojoules,
+                    sufferScore: a.sufferScore,
+                    url: URL(string: "/strava/activities/\(a.id!)")!
+                )
         }
-        
-        return FeatureCollection(features: features + gemeenteFeatures)
     }
     
     struct GetTile: Content {
@@ -70,11 +92,24 @@ struct StravaController: RouteCollection {
         let user = try req.auth.require(User.self)
         
         guard let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).with(\.$tiles).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
             throw Abort(.notFound)
         }
         
         return try await activity.getTiles(on: req.db).map { .init(x: $0.x, y: $0.y, z: $0.z, url: $0.url) }
+    }
+    
+    func featureCollection(req: Request) async throws -> FeatureCollection {
+        let user = try req.auth.require(User.self)
+        
+        guard let activityId = req.parameters.get("activityID", as: UUID.self),
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+            throw Abort(.notFound)
+        }
+        
+        try await activity.getTiles(on: req.db)
+        
+        return activity.featureCollection
     }
     
     func authenticate(req: Request) async throws -> Response {
@@ -97,8 +132,8 @@ struct StravaController: RouteCollection {
         guard let _ = try await req.auth.require(User.self).$stravaToken.get(on: req.db) else {
             return req.redirect(to: "/strava/authenticate")
         }
-        let activities = try await loadActivities(req: req)
-        return try await activities.encodeResponse(for: req)
+        try await loadActivities(req: req)
+        return req.redirect(to: "/strava/activities")
     }
     
     struct Token: Content {
