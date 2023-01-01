@@ -8,6 +8,7 @@
 import Vapor
 import FluentPostGIS
 import GeoJSON
+import FluentSQL
 
 
 struct StravaController: RouteCollection {
@@ -19,8 +20,11 @@ struct StravaController: RouteCollection {
         sessionAuth.get("exchange_token", use: exchangeToken)
 
         sessionAuth.get("sync", use: sync)
-        sessionAuth.get("activities", use: activities)
-        sessionAuth.get("activities/:activityID", use: activity)
+        let activitiesRoutes = sessionAuth.grouped("activities")
+        activitiesRoutes.get(use: activities)
+        let activityRoute = activitiesRoutes.grouped(":activityID")
+        activityRoute.get(use: activity)
+        activityRoute.get("tiles", use: tiles)
     }
     
     func activity(req: Request) async throws -> FeatureCollection {
@@ -53,6 +57,64 @@ struct StravaController: RouteCollection {
         }
         
         return FeatureCollection(features: features + gemeenteFeatures)
+    }
+    
+    struct Tile: Content {
+        let x: Int
+        let y: Int
+        let z: Int
+        
+        let url: String?
+    }
+    func tiles(req: Request) async throws -> [Tile] {
+        let user = try req.auth.require(User.self)
+        
+        guard let sql = req.db as? SQLDatabase, let activityId = req.parameters.get("activityID", as: UUID.self),
+              let _ = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+            throw Abort(.notFound)
+        }
+        
+        // 24d2e128-3ef4-411c-9453-99acf67ae670
+        var tiles = try await sql.raw("""
+WITH
+  -- parameter injection, for convenience
+  zoom(lvl, csize) AS (
+    VALUES ( 14, (2*PI()*6378137)/POW(2, 14) )
+  ),
+
+  -- subdivide your polygons to minimize per-geometry vertex count
+  poi AS (
+    SELECT
+      id, sdv AS geom
+    FROM
+      strava_activities AS ply,
+      LATERAL ST_SubDivide(
+        ST_Transform(ply.map_summary_line, 3857),
+        64
+      ) AS sdv
+      WHERE id='\(activityId.uuidString)'
+  )
+
+-- get all covering tile indices for each POI
+SELECT DISTINCT
+  grid.i as x, grid.j as y, z.lvl as z
+FROM
+  zoom as z,
+  poi AS t,
+  LATERAL ST_SquareGrid(z.csize, t.geom) AS grid
+
+-- filter for those that actually intersect any of the subdivisions
+WHERE
+  ST_Intersects(t.geom, grid.geom)
+;
+""").all(decoding: Tile.self)
+        
+        tiles = tiles.map {
+            let x = $0.x + 8192
+            let y = 8192 - $0.y
+            return Tile(x: x, y: y, z: $0.z, url: "https://tile.openstreetmap.org/\($0.z)/\(x)/\(y).png")
+        }
+        return tiles
     }
     
     func authenticate(req: Request) async throws -> Response {
