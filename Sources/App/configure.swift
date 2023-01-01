@@ -1,5 +1,6 @@
 import Fluent
 import FluentPostgresDriver
+import FluentPostGIS
 import Leaf
 import Redis
 import Vapor
@@ -28,6 +29,15 @@ public func configure(_ app: Application) throws {
     app.migrations.add(User.Migration())
     app.migrations.add(UserToken.Migration())
     app.migrations.add(StravaToken.Migration())
+    
+    app.migrations.add(EnablePostGISMigration())
+
+    app.migrations.add(StravaActivity.Migration())
+    app.migrations.add(ActivityTile.Migration())
+    app.migrations.add(ActivityCounty.Migration())
+
+//    app.logger.logLevel = .debug
+    app.http.server.configuration.responseCompression = .enabled
 
     // register routes
     try routes(app)
