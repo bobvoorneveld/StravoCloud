@@ -203,7 +203,10 @@ final class StravaActivity: Model, Content {
     
     @Children(for: \.$activity)
     var tiles: [ActivityTile]
-
+    
+    @Siblings(through: ActivityCounty.self, from: \.$activity, to: \.$county)
+    var counties: [County]
+    
     init() { }
 
     init(id: UUID? = nil, activity: SummaryActivity, userID: User.IDValue) {

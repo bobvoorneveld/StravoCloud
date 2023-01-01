@@ -29,8 +29,12 @@ extension StravaActivity {
         tiles.map { $0.feature }
     }
     
+    var countyFeatures: [Feature] {
+        counties.map { $0.feature }
+    }
+    
     var features: [Feature] {
-        tileFeatures + [feature]
+        countyFeatures + tileFeatures + [feature]
     }
     
     var featureCollection: FeatureCollection {

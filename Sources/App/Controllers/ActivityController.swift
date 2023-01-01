@@ -19,6 +19,7 @@ struct ActivityController: RouteCollection {
         let activityRoute = activitiesRoutes.grouped(":activityID")
         activityRoute.get(use: activity)
         activityRoute.get("tiles", use: tiles)
+        activityRoute.get("counties", use: counties)
         activityRoute.get("feature-collection", use: featureCollection)
     }
     
@@ -93,6 +94,17 @@ struct ActivityController: RouteCollection {
         return try await activity.getTiles(on: req.db).map { .init(x: $0.x, y: $0.y, z: $0.z, url: $0.url) }
     }
     
+    func counties(req: Request) async throws -> [County] {
+        let user = try req.auth.require(User.self)
+        
+        guard let activityId = req.parameters.get("activityID", as: UUID.self),
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+            throw Abort(.notFound)
+        }
+        
+        return try await activity.getCounties(on: req.db)
+    }
+    
     func featureCollection(req: Request) async throws -> FeatureCollection {
         let user = try req.auth.require(User.self)
         
@@ -102,6 +114,7 @@ struct ActivityController: RouteCollection {
         }
         
         try await activity.getTiles(on: req.db)
+        try await activity.getCounties(on: req.db)
         
         return activity.featureCollection
     }

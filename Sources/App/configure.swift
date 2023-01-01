@@ -34,6 +34,7 @@ public func configure(_ app: Application) throws {
 
     app.migrations.add(StravaActivity.Migration())
     app.migrations.add(ActivityTile.Migration())
+    app.migrations.add(ActivityCounty.Migration())
 
 //    app.logger.logLevel = .debug
     app.http.server.configuration.responseCompression = .enabled
