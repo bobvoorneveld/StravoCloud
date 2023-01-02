@@ -7,7 +7,8 @@
 
 import Vapor
 import GeoJSON
-
+import FluentKit
+import FluentPostGIS
 
 struct ActivityController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
@@ -15,11 +16,16 @@ struct ActivityController: RouteCollection {
         let activitiesRoutes = sessionAuth.grouped("activities")
         activitiesRoutes.get(use: activities)
         activitiesRoutes.get("sync", use: sync)
+
+        let featureCollectionRoutes = activitiesRoutes.grouped("feature-collection")
+        featureCollectionRoutes.get(use: featureCollectionForUser)
+        featureCollectionRoutes.get(":filter", use: featureCollectionForUser)
         
         let activityRoute = activitiesRoutes.grouped(":activityID")
         activityRoute.get(use: activity)
         activityRoute.get("tiles", use: tiles)
         activityRoute.get("counties", use: counties)
+        activityRoute.get("sync", use: detailedSync)
         activityRoute.get("feature-collection", use: featureCollection)
     }
     
@@ -87,7 +93,7 @@ struct ActivityController: RouteCollection {
         let user = try req.auth.require(User.self)
         
         guard let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityId).first() else {
             throw Abort(.notFound)
         }
         
@@ -98,7 +104,7 @@ struct ActivityController: RouteCollection {
         let user = try req.auth.require(User.self)
         
         guard let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityId).first() else {
             throw Abort(.notFound)
         }
         
@@ -109,7 +115,7 @@ struct ActivityController: RouteCollection {
         let user = try req.auth.require(User.self)
         
         guard let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityId).first() else {
             throw Abort(.notFound)
         }
         
@@ -120,10 +126,57 @@ struct ActivityController: RouteCollection {
     }
     
     func sync(req: Request) async throws -> Response {
-        guard let _ = try await req.auth.require(User.self).$stravaToken.get(on: req.db) else {
+        let user = try req.auth.require(User.self)
+
+        guard let _ = try await user.$stravaToken.get(on: req.db) else {
             return req.redirect(to: "/strava/authenticate")
         }
-        try await loadActivities(req: req)
-        return req.redirect(to: "/activities")
+        try await req.queue.dispatch(
+                SyncActivities.self,
+                .init(userID: user.requireID()))
+        return try await "syncing".encodeResponse(for: req)
+    }
+    
+    func detailedSync(req: Request) async throws -> Response {
+        let user = try req.auth.require(User.self)
+
+        guard let _ = try await user.$stravaToken.get(on: req.db) else {
+            return req.redirect(to: "/strava/authenticate")
+        }
+        
+        guard let activityID = req.parameters.get("activityID", as: UUID.self),
+                let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityID).first() else {
+            throw Abort(.notFound)
+        }
+
+        let forced = (try? req.query.get(at: "forced")) ?? false
+        try await req.queue.dispatch(
+            SyncDetailedActivity.self,
+            .init(activityID: activityID, forced: forced)
+        )
+        return try await "\(forced ? "Forced " : "")syncing activity \(activity.name)".encodeResponse(for: req)
+    }
+    
+    func featureCollectionForUser(req: Request) async throws -> FeatureCollection {
+        let user = try req.auth.require(User.self)
+        
+        guard let filter = req.parameters.get("filter") else {
+            return try await user.getFeatureCollection(req: req)
+        }
+
+        req.logger.info("Filter: \(filter)")
+        let regex = #/@(?<lng>\d+.\d+),(?<lat>\d+.\d+),(?<zoom>\d+(.\d+)?)/#
+        guard let match = filter.firstMatch(of: regex) else {
+            throw Abort(.badRequest)
+        }
+        
+        return try await user.getFeatureCollection(
+            req: req,
+            filter: .init(
+                lat: Double(match.lat)!,
+                lng: Double(match.lng)!,
+                zoom: Float(match.zoom)!
+            )
+        )
     }
 }

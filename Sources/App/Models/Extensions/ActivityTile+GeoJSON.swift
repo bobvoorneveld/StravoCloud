@@ -20,7 +20,10 @@ extension ActivityTile {
     }
     
     var feature: Feature {
-        Feature(geometry: .polygon(try! Polygon(coordinates: [cornerPositions])))
+        Feature(
+            geometry: .polygon(try! Polygon(coordinates: [cornerPositions])),
+            properties: ["x": "\(x)", "y": "\(y)", "z": "\(z)"]
+        )
     }
 }
 

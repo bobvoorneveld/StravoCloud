@@ -1,10 +1,10 @@
-// swift-tools-version:5.6
+// swift-tools-version:5.7
 import PackageDescription
 
 let package = Package(
     name: "StravoCloud",
     platforms: [
-       .macOS(.v12)
+        .macOS(.v13)
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/brokenhandsio/fluent-postgis.git", from: "0.3.0"),
         .package(url: "https://github.com/vapor/leaf.git", from: "4.0.0"),
         .package(url: "https://github.com/vapor/redis", from: "4.2.0"),
+        .package(url: "https://github.com/vapor/queues-redis-driver.git", from: "1.0.0"),
         
         .package(url: "https://github.com/raphaelmor/Polyline.git", from: "5.0.2"),
         .package(url: "https://github.com/kiliankoe/GeoJSON.git", from: "0.6.1"),
@@ -27,6 +28,7 @@ let package = Package(
                 .product(name: "FluentPostGIS", package: "fluent-postgis"),
                 .product(name: "Leaf", package: "leaf"),
                 .product(name: "Redis", package: "redis"),
+                .product(name: "QueuesRedisDriver", package: "queues-redis-driver"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Polyline", package: "Polyline"),
                 .product(name: "GeoJSON", package: "GeoJSON"),

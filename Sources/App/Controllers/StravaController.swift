@@ -29,7 +29,7 @@ struct StravaController: RouteCollection {
             return req.redirect(to: "https://www.strava.com/oauth/authorize?client_id=\(clientID)&response_type=code&redirect_uri=http://localhost:8080/strava/exchange_token&approval_prompt=force&scope=read_all,profile:read_all,activity:read_all")
         }
         
-        try await token.renewToken(req: req)
+        try await token.renewToken(app: req.application)
         
         return try await user.stravaToken!.encodeResponse(for: req)
     }

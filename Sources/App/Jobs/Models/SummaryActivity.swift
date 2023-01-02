@@ -74,6 +74,7 @@ struct Athlete: Codable {
 // MARK: - Map
 struct Map: Codable {
     let id: String
+    let polyline: String?
     let summaryPolyline: String
 }
 

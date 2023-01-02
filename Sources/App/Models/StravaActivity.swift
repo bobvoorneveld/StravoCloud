@@ -102,6 +102,12 @@ final class StravaActivity: Model, Content {
     @Field(key: "map_summary_line")
     var summaryLine: GeometricLineString2D
 
+    @Field(key: "map_detailed_polyline")
+    var detailedPolyline: String?
+    
+    @Field(key: "map_detailed_line")
+    var detailedLine: GeometricLineString2D?
+
     @Field(key: "trainer")
     var trainer: Bool
     
@@ -273,5 +279,21 @@ final class StravaActivity: Model, Content {
         self.sufferScore = activity.sufferScore
         
         self.$user.id = userID
+    }
+}
+
+extension StravaActivity {
+    func update(with stravaActivity: SummaryActivity, on db: Database) async throws {
+        self.detailedPolyline = stravaActivity.map.polyline
+     
+        guard let polyline = stravaActivity.map.polyline else {
+            return
+        }
+        let coordinates = Polyline(encodedPolyline: polyline).coordinates!
+        let points = coordinates.map { GeometricPoint2D(x: $0.longitude, y: $0.latitude) }
+        let linestring = GeometricLineString2D(points: points)
+        self.detailedLine = linestring
+        
+        try await save(on: db)
     }
 }

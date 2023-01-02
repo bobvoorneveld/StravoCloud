@@ -31,3 +31,13 @@ final class County: Model, Content {
     
     init() { }
 }
+
+extension County: Equatable, Hashable {
+    static func == (lhs: County, rhs: County) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id!)
+    }
+}
