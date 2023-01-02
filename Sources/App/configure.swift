@@ -26,8 +26,8 @@ public func configure(_ app: Application) throws {
     app.sessions.use(.redis)
     app.middleware.use(app.sessions.middleware)
 
-    try loadMigrations(app: app)
-    try addJobs(app: app)
+    try setupMigrations(app: app)
+    try setupJobs(app: app)
 
     //    app.logger.logLevel = .debug
     app.http.server.configuration.responseCompression = .enabled

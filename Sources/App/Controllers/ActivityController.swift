@@ -7,6 +7,7 @@
 
 import Vapor
 import GeoJSON
+import FluentKit
 
 
 struct ActivityController: RouteCollection {
@@ -21,6 +22,7 @@ struct ActivityController: RouteCollection {
         activityRoute.get("tiles", use: tiles)
         activityRoute.get("counties", use: counties)
         activityRoute.get("feature-collection", use: featureCollection)
+        activityRoute.get("sync", use: detailedSync)
     }
     
     func activity(req: Request) async throws -> StravaActivity {
@@ -87,7 +89,7 @@ struct ActivityController: RouteCollection {
         let user = try req.auth.require(User.self)
         
         guard let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityId).first() else {
             throw Abort(.notFound)
         }
         
@@ -98,7 +100,7 @@ struct ActivityController: RouteCollection {
         let user = try req.auth.require(User.self)
         
         guard let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityId).first() else {
             throw Abort(.notFound)
         }
         
@@ -109,7 +111,7 @@ struct ActivityController: RouteCollection {
         let user = try req.auth.require(User.self)
         
         guard let activityId = req.parameters.get("activityID", as: UUID.self),
-              let activity = try await user.$activities.query(on: req.db).filter(\.$id, .equal, activityId).first() else {
+              let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityId).first() else {
             throw Abort(.notFound)
         }
         
@@ -129,5 +131,23 @@ struct ActivityController: RouteCollection {
                 SyncActivities.self,
                 .init(userID: user.requireID()))
         return try await "syncing".encodeResponse(for: req)
+    }
+    
+    func detailedSync(req: Request) async throws -> Response {
+        let user = try req.auth.require(User.self)
+
+        guard let _ = try await user.$stravaToken.get(on: req.db) else {
+            return req.redirect(to: "/strava/authenticate")
+        }
+        
+        guard let activityID = req.parameters.get("activityID", as: UUID.self),
+                let activity = try await user.$activities.query(on: req.db).filter(\.$id == activityID).first() else {
+            throw Abort(.notFound)
+        }
+
+        try await req.queue.dispatch(
+            SyncDetailedActivity.self,
+                .init(activityID: activityID))
+        return try await "syncing activity \(activity.name)".encodeResponse(for: req)
     }
 }

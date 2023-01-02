@@ -9,10 +9,11 @@ import GeoJSON
 
 extension StravaActivity {
     var feature: Feature {
-        Feature(geometry:
+        let line = detailedLine ?? summaryLine
+        return Feature(geometry:
                 .lineString(
                     try! .init(coordinates:
-                            summaryLine.points.map {
+                            line.points.map {
                                 .init(longitude: $0.x, latitude: $0.y)
                             }
                          )

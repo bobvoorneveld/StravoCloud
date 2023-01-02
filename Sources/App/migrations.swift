@@ -9,7 +9,7 @@ import Vapor
 import FluentPostGIS
 
 
-func loadMigrations(app: Application) throws {
+func setupMigrations(app: Application) throws {
     app.migrations.add(User.Migration())
     app.migrations.add(UserToken.Migration())
     app.migrations.add(StravaToken.Migration())
@@ -19,4 +19,6 @@ func loadMigrations(app: Application) throws {
     app.migrations.add(StravaActivity.Migration())
     app.migrations.add(ActivityTile.Migration())
     app.migrations.add(ActivityCounty.Migration())
+    
+    app.migrations.add(StravaActivity.AddDetailedMapLine())
 }

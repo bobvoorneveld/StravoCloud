@@ -11,15 +11,19 @@ import FluentSQL
 extension StravaActivity {
 
     @discardableResult
-    func getTiles(on db: Database) async throws -> [ActivityTile] {
-        try await $tiles.load(on: db)
-        guard tiles.isEmpty else  {
-            return tiles
+    func getTiles(on db: Database, forced: Bool = false) async throws -> [ActivityTile] {
+        if !forced {
+            try await $tiles.load(on: db)
+            guard tiles.isEmpty else  {
+                return tiles
+            }
         }
 
         guard let sql = db as? SQLDatabase else {
             throw Abort(.internalServerError)
         }
+        
+        let column = detailedLine != nil ? "map_detailed_line" : "map_summary_line"
 
         var tiles = try await sql.raw("""
 WITH
@@ -35,7 +39,7 @@ WITH
     FROM
       strava_activities AS ply,
       LATERAL ST_SubDivide(
-        ST_Transform(ply.map_summary_line, 3857),
+        ST_Transform(ply.\(raw: column), 3857),
         64
       ) AS sdv
       WHERE id='\(raw: id!.uuidString)'
@@ -60,9 +64,18 @@ WHERE
             let y = 8192 - $0.y
             return Tile(x: x, y: y, z: $0.z)
         }
-        
+
+        if forced {
+            // Remove any old tiles
+            try await $tiles.query(on: db).delete()
+        }
+        // Store new tiles
         try await tiles.map { ActivityTile(activityID: id!, x: $0.x, y: $0.y, z: $0.z) }.create(on: db)
+        
+        // load the new tiles
         try await $tiles.load(on: db)
+        
+        // return them
         return self.tiles
     }
     

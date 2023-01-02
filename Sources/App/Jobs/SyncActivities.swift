@@ -23,14 +23,16 @@ struct SyncActivities: AsyncJob {
     }
 }
 
-enum SyncActivitiesError: Error {
+enum StravaError: Error {
     case noUser
+    case noActivity
+    case invalidToken
 }
 
 extension SyncActivities {
     func loadActivities(userID: UUID, app: Application) async throws {
         guard let user = try await User.find(userID, on: app.db) else {
-            throw SyncActivitiesError.noUser
+            throw StravaError.noUser
         }
         
         let lastRideStartDate = try await user.$activities.query(on: app.db)
