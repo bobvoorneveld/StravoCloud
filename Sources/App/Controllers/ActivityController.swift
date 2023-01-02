@@ -120,10 +120,14 @@ struct ActivityController: RouteCollection {
     }
     
     func sync(req: Request) async throws -> Response {
-        guard let _ = try await req.auth.require(User.self).$stravaToken.get(on: req.db) else {
+        let user = try req.auth.require(User.self)
+
+        guard let _ = try await user.$stravaToken.get(on: req.db) else {
             return req.redirect(to: "/strava/authenticate")
         }
-        try await loadActivities(req: req)
-        return req.redirect(to: "/activities")
+        try await req.queue.dispatch(
+                SyncActivities.self,
+                .init(userID: user.requireID()))
+        return try await "syncing".encodeResponse(for: req)
     }
 }

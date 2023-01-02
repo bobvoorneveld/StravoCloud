@@ -22,7 +22,7 @@ func loadActivities(req: Request) async throws -> [StravaActivity] {
         req.logger.info("No sync before, loading all")
     }
 
-    guard let accessToken = try await user.stravaToken?.getAccessToken(req: req) else {
+    guard let accessToken = try await user.stravaToken?.getAccessToken(app: req.application) else {
         throw StravaError.invalidToken
     }
     

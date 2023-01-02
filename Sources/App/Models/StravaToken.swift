@@ -44,13 +44,13 @@ extension StravaToken {
         let accessToken: String
         let expiresAt: TimeInterval
     }
-    func renewToken(req: Request) async throws {
+    func renewToken(app: Application) async throws {
         guard let clientID = Environment.get("STRAVA_CLIENT_ID"), let clientSecret = Environment.get("STRAVA_CLIENT_SECRET") else {
             throw Abort(.preconditionFailed)
         }
 
         if let expires = expiresAt, expires < Date() {
-            let res = try await req.client.post("https://www.strava.com/oauth/token?client_id=\(clientID)&client_secret=\(clientSecret)&grant_type=refresh_token&refresh_token=\(refreshToken)")
+            let res = try await app.client.post("https://www.strava.com/oauth/token?client_id=\(clientID)&client_secret=\(clientSecret)&grant_type=refresh_token&refresh_token=\(refreshToken)")
             
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -59,12 +59,12 @@ extension StravaToken {
             
             accessToken = newToken.accessToken
             expiresAt = Date(timeIntervalSince1970: newToken.expiresAt)
-            try await update(on: req.db)
+            try await update(on: app.db)
         }
     }
     
-    func getAccessToken(req: Request) async throws -> String {
-        try await renewToken(req: req)
+    func getAccessToken(app: Application) async throws -> String {
+        try await renewToken(app: app)
         return accessToken!
     }
 }

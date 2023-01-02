@@ -1,6 +1,5 @@
 import Fluent
 import FluentPostgresDriver
-import FluentPostGIS
 import Leaf
 import Redis
 import Vapor
@@ -23,22 +22,16 @@ public func configure(_ app: Application) throws {
     let redisHostname = Environment.get("REDIS_HOSTNAME") ?? "localhost"
     let redisConfig = try RedisConfiguration(hostname: redisHostname)
     app.redis.configuration = redisConfig
+    
     app.sessions.use(.redis)
     app.middleware.use(app.sessions.middleware)
 
-    app.migrations.add(User.Migration())
-    app.migrations.add(UserToken.Migration())
-    app.migrations.add(StravaToken.Migration())
-    
-    app.migrations.add(EnablePostGISMigration())
+    try loadMigrations(app: app)
+    try addJobs(app: app)
 
-    app.migrations.add(StravaActivity.Migration())
-    app.migrations.add(ActivityTile.Migration())
-    app.migrations.add(ActivityCounty.Migration())
-
-//    app.logger.logLevel = .debug
+    //    app.logger.logLevel = .debug
     app.http.server.configuration.responseCompression = .enabled
-
+    
     // register routes
     try routes(app)
 }
