@@ -34,3 +34,10 @@ func tileToLatLon(tileX : Int, tileY : Int, mapZoom: Int) -> Position {
     
     return Position(longitude: lon, latitude: lat)
 }
+
+func tranformCoordinate(_ latitude: Double, _ longitude: Double, withZoom zoom: Double) -> (x: Int, y: Int) {
+    let tileX = Int(floor((longitude + 180) / 360.0 * pow(2.0, zoom)))
+    let tileY = Int(floor((1 - log( tan( latitude * Double.pi / 180.0 ) + 1 / cos( latitude * Double.pi / 180.0 )) / Double.pi ) / 2 * pow(2.0, zoom)))
+    
+    return (tileX, tileY)
+}
