@@ -145,9 +145,11 @@ struct ActivityController: RouteCollection {
             throw Abort(.notFound)
         }
 
+        let forced = (try? req.query.get(at: "forced")) ?? false
         try await req.queue.dispatch(
             SyncDetailedActivity.self,
-                .init(activityID: activityID))
-        return try await "syncing activity \(activity.name)".encodeResponse(for: req)
+            .init(activityID: activityID, forced: forced)
+        )
+        return try await "\(forced ? "Forced " : "")syncing activity \(activity.name)".encodeResponse(for: req)
     }
 }

@@ -13,6 +13,7 @@ import Vapor
 
 struct DetailedActivityPayload: Codable {
     let activityID: UUID
+    let forced: Bool
 }
 
 struct SyncDetailedActivity: AsyncJob {
@@ -30,6 +31,11 @@ struct SyncDetailedActivity: AsyncJob {
             throw StravaError.noActivity
         }
         
+        guard payload.forced || activity.detailedLine == nil else {
+            context.logger.info("Already fetched, not forced, done")
+            return
+        }
+        
         guard let accessToken = try await activity.user.stravaToken?.getAccessToken(app: context.application) else {
             throw StravaError.invalidToken
         }
@@ -37,7 +43,17 @@ struct SyncDetailedActivity: AsyncJob {
         let response = try await context.application.client.get("https://www.strava.com/api/v3/activities/\(activity.stravaID)") { req in
                 req.headers.bearerAuthorization = BearerAuthorization(token: accessToken)
             }
-            
+        
+        if response.status == .tooManyRequests {
+            // go again after 15 minutes
+            try await context.queue.dispatch(
+                SyncDetailedActivity.self,
+                payload,
+                delayUntil: Date(timeIntervalSinceNow: 60 * 15) // Rate limit of 100 every 15 minutes
+            )
+            throw StravaError.tooManyRequests
+        }
+
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .iso8601

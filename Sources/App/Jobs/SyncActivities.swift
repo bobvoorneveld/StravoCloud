@@ -18,45 +18,43 @@ struct SyncActivities: AsyncJob {
     typealias Payload = UserToSync
 
     func dequeue(_ context: QueueContext, _ payload: UserToSync) async throws {
-        context.application.logger.info("syncing")
-        try await loadActivities(userID: payload.userID, app: context.application)
+        context.logger.info("syncing")
+        try await loadActivities(userID: payload.userID, context: context)
     }
 }
 
 enum StravaError: Error {
-    case noUser
-    case noActivity
-    case invalidToken
+    case noUser, noActivity, invalidToken, tooManyRequests
 }
 
 extension SyncActivities {
-    func loadActivities(userID: UUID, app: Application) async throws {
-        guard let user = try await User.find(userID, on: app.db) else {
+    func loadActivities(userID: UUID, context: QueueContext) async throws {
+        guard let user = try await User.find(userID, on: context.application.db) else {
             throw StravaError.noUser
         }
         
-        let lastRideStartDate = try await user.$activities.query(on: app.db)
+        let lastRideStartDate = try await user.$activities.query(on: context.application.db)
             .sort(\.$startDate, .descending)
             .first()?
             .startDate
 
         if let lastRideStartDate {
-            app.logger.info("Last start date? \(lastRideStartDate)")
+            context.logger.info("Last start date? \(lastRideStartDate)")
         } else {
-            app.logger.info("No sync before, loading all")
+            context.logger.info("No sync before, loading all")
         }
 
-        try await user.$stravaToken.load(on: app.db)
+        try await user.$stravaToken.load(on: context.application.db)
 
-        guard let accessToken = try await user.stravaToken?.getAccessToken(app: app) else {
+        guard let accessToken = try await user.stravaToken?.getAccessToken(app: context.application) else {
             throw StravaError.invalidToken
         }
         
         var activities = [SummaryActivity]()
         var page = 1
         while true {
-            app.logger.info("Loading page: \(page)")
-            let response = try await app.client.get("https://www.strava.com/api/v3/athlete/activities") { req in
+            context.logger.info("Loading page: \(page)")
+            let response = try await context.application.client.get("https://www.strava.com/api/v3/athlete/activities") { req in
                 var query = [
                     "page": "\(page)",
                     "per_page": "30"
@@ -66,6 +64,10 @@ extension SyncActivities {
                 }
                 try req.query.encode(query)
                 req.headers.bearerAuthorization = BearerAuthorization(token: accessToken)
+            }
+            
+            if response.status == .tooManyRequests {
+                throw StravaError.tooManyRequests
             }
             
             let decoder = JSONDecoder()
@@ -80,16 +82,25 @@ extension SyncActivities {
             }
         }
 
-        let existingIDs = Set(try await StravaActivity.query(on: app.db).field(\.$stravaID).all().map { $0.stravaID })
+        let existingIDs = Set(try await StravaActivity.query(on: context.application.db).field(\.$stravaID).all().map { $0.stravaID })
 
-        app.logger.info("Existing ids in database: \(existingIDs.count)")
+        context.logger.info("Existing ids in database: \(existingIDs.count)")
 
         let stravaActivities = activities
             .filter { !existingIDs.contains($0.id) }
             .map { StravaActivity(activity: $0, userID: user.id!) }
 
-        app.logger.info("Adding activities to database: \(stravaActivities.count)")
+        context.logger.info("Adding activities to database: \(stravaActivities.count)")
 
-        try await stravaActivities.create(on: app.db)
+        try await stravaActivities.create(on: context.application.db)
+        
+        context.logger.info("Syncing details of every activity")
+        
+        for activity in try await user.$activities.query(on: context.application.db).all() {
+            try await context.queue.dispatch(
+                SyncDetailedActivity.self,
+                .init(activityID: try activity.requireID(), forced: false)
+            )
+        }
     }
 }
