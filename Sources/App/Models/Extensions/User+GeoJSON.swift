@@ -10,32 +10,42 @@ import Fluent
 import FluentKit
 import Vapor
 import FluentPostGIS
+import FluentSQL
 
 
 extension User {
+    func getFilteredActivities(req: Request, filter: ActivityFilter) -> QueryBuilder<StravaActivity> {
+        
+        // tiles are 256 px, a high def screen is 3456 pixels wide (lets do 1.5x) -> ~ 20 tiles
+        let tileWidth = (360 / Double(pow(2, filter.zoom)))
+        let delta = ((3456 * 1.5) / 256) * tileWidth / 2
+        let box = GeometricPolygon2D(exteriorRing: .init(points: [
+            GeometricPoint2D(x: filter.lat - delta, y: filter.lng - delta),
+            GeometricPoint2D(x: filter.lat + delta, y: filter.lng - delta),
+            GeometricPoint2D(x: filter.lat + delta, y: filter.lng + delta),
+            GeometricPoint2D(x: filter.lat - delta, y: filter.lng + delta),
+            GeometricPoint2D(x: filter.lat - delta, y: filter.lng - delta),
+        ]))
+        
+        return $activities.query(on: req.db)
+            .with(\.$counties)
+            .filterGeometryCrosses(\.$summaryLine, box)
+    }
+
     func getFeatureCollection(req: Request, filter: ActivityFilter? = nil) async throws -> FeatureCollection {
         
-        var query = $activities.query(on: req.db)
-            .with(\.$counties)
-
+        req.logger.info("loading activities")
+        let acts: [StravaActivity]
         if let filter {
-            let zoom = (360 / Double(pow(2, filter.zoom))) / 2
-            let box = GeometricPolygon2D(exteriorRing: .init(points: [
-                GeometricPoint2D(x: filter.lat - zoom, y: filter.lng - zoom),
-                GeometricPoint2D(x: filter.lat + zoom, y: filter.lng - zoom),
-                GeometricPoint2D(x: filter.lat + zoom, y: filter.lng + zoom),
-                GeometricPoint2D(x: filter.lat - zoom, y: filter.lng + zoom),
-                GeometricPoint2D(x: filter.lat - zoom, y: filter.lng - zoom),
-            ]))
-            
-            query = query.filterGeometryCrosses(\.$summaryLine, box)
+            acts = try await getFilteredActivities(req: req, filter: filter).all()
+        } else {
+            acts = try await $activities.query(on: req.db).all()
         }
         
-        req.logger.info("loading activities")
-        let activities = try await query.all()
+        req.logger.info("number: \(acts.count)")
 
         req.logger.info("getting activity features")
-        let activityFeatures = activities.map { $0.summaryFeature }
+        let activityFeatures = acts.map { $0.summaryFeature }
         
         req.logger.info("loading tiles")
         var tileQuery = ActivityTile.query(on: req.db)
@@ -43,9 +53,11 @@ extension User {
             .filter(StravaActivity.self, \.$user.$id == id!)
         
         if let filter {
-            let zoom = (360 / Double(pow(2, filter.zoom)))
-            let upperLeft = tranformCoordinate(filter.lng - zoom, filter.lat - zoom, withZoom: 14)
-            let downRight = tranformCoordinate(filter.lng + zoom, filter.lat + zoom, withZoom: 14)
+            // tiles are 256 px, a high def screen is 3456 pixels wide (lets do 1.5x) -> 28 tiles
+            let tileWidth = (360 / Double(pow(2, filter.zoom)))
+            let delta = ((3456 * 1.5) / 256) * tileWidth / 2
+            let upperLeft = tranformCoordinate(filter.lng - delta, filter.lat - delta, withZoom: 14)
+            let downRight = tranformCoordinate(filter.lng + delta, filter.lat + delta, withZoom: 14)
             
             tileQuery = tileQuery
                 .filter(\.$x >= upperLeft.x)

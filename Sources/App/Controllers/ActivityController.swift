@@ -60,7 +60,21 @@ struct ActivityController: RouteCollection {
     func activities(req: Request) async throws -> [GetAllActivity] {
         let user = try req.auth.require(User.self)
         
-        return try await user.$activities.query(on: req.db)
+        let query: QueryBuilder<StravaActivity>
+        
+        if let filter: String = try? req.query.get(at: "filter") {
+            req.logger.info("Filter: \(filter)")
+            let regex = #/(?<lng>\d+.\d+),(?<lat>\d+.\d+),(?<zoom>\d+(.\d+)?)/#
+            guard let match = filter.firstMatch(of: regex) else {
+                throw Abort(.badRequest)
+            }
+
+            query = user.getFilteredActivities(req: req, filter: .init(lat: Double(match.lat)!, lng: Double(match.lng)!, zoom: Float(match.zoom)!))
+        } else {
+            query = user.$activities.query(on: req.db)
+        }
+        
+        return try await query
             .sort(\.$startDate, .descending)
             .all()
             .compactMap { a in
@@ -160,12 +174,12 @@ struct ActivityController: RouteCollection {
     func featureCollectionForUser(req: Request) async throws -> FeatureCollection {
         let user = try req.auth.require(User.self)
         
-        guard let filter = req.parameters.get("filter") else {
+        guard let filter: String = try? req.query.get(at: "filter") else {
             return try await user.getFeatureCollection(req: req)
         }
 
         req.logger.info("Filter: \(filter)")
-        let regex = #/@(?<lng>\d+.\d+),(?<lat>\d+.\d+),(?<zoom>\d+(.\d+)?)/#
+        let regex = #/(?<lng>\d+.\d+),(?<lat>\d+.\d+),(?<zoom>\d+(.\d+)?)/#
         guard let match = filter.firstMatch(of: regex) else {
             throw Abort(.badRequest)
         }
