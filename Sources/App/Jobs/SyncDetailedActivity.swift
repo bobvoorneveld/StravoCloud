@@ -46,11 +46,11 @@ struct SyncDetailedActivity: AsyncJob {
         
         if response.status == .tooManyRequests {
             // go again after 15 minutes
-            try await context.queue.dispatch(
-                SyncDetailedActivity.self,
-                payload,
-                delayUntil: Date(timeIntervalSinceNow: 60 * 15) // Rate limit of 100 every 15 minutes
-            )
+//            try await context.queue.dispatch(
+//                SyncDetailedActivity.self,
+//                payload,
+//                delayUntil: Date(timeIntervalSinceNow: 60 * 15) // Rate limit of 100 every 15 minutes
+//            )
             throw StravaError.tooManyRequests
         }
 

@@ -15,6 +15,7 @@ struct ActivityController: RouteCollection {
         let sessionAuth = routes.grouped([User.sessionAuthenticator(), User.redirectMiddleware(path: "/users/login")])
         let activitiesRoutes = sessionAuth.grouped("activities")
         activitiesRoutes.get(use: activities)
+        activitiesRoutes.get("feature-collection", use: featureCollectionForUser)
         activitiesRoutes.get("sync", use: sync)
         
         let activityRoute = activitiesRoutes.grouped(":activityID")
@@ -151,5 +152,11 @@ struct ActivityController: RouteCollection {
             .init(activityID: activityID, forced: forced)
         )
         return try await "\(forced ? "Forced " : "")syncing activity \(activity.name)".encodeResponse(for: req)
+    }
+    
+    func featureCollectionForUser(req: Request) async throws -> FeatureCollection {
+        let user = try req.auth.require(User.self)
+        
+        return try await user.getFeatureCollection(req: req)
     }
 }
