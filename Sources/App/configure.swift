@@ -29,7 +29,7 @@ public func configure(_ app: Application) throws {
     try setupMigrations(app: app)
     try setupJobs(app: app)
 
-    //    app.logger.logLevel = .debug
+    app.logger.logLevel = .debug
     app.http.server.configuration.responseCompression = .enabled
     
     // register routes

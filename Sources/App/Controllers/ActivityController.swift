@@ -8,22 +8,25 @@
 import Vapor
 import GeoJSON
 import FluentKit
-
+import FluentPostGIS
 
 struct ActivityController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
         let sessionAuth = routes.grouped([User.sessionAuthenticator(), User.redirectMiddleware(path: "/users/login")])
         let activitiesRoutes = sessionAuth.grouped("activities")
         activitiesRoutes.get(use: activities)
-        activitiesRoutes.get("feature-collection", use: featureCollectionForUser)
         activitiesRoutes.get("sync", use: sync)
+
+        let featureCollectionRoutes = activitiesRoutes.grouped("feature-collection")
+        featureCollectionRoutes.get(use: featureCollectionForUser)
+        featureCollectionRoutes.get(":filter", use: featureCollectionForUser)
         
         let activityRoute = activitiesRoutes.grouped(":activityID")
         activityRoute.get(use: activity)
         activityRoute.get("tiles", use: tiles)
         activityRoute.get("counties", use: counties)
-        activityRoute.get("feature-collection", use: featureCollection)
         activityRoute.get("sync", use: detailedSync)
+        activityRoute.get("feature-collection", use: featureCollection)
     }
     
     func activity(req: Request) async throws -> StravaActivity {
@@ -157,6 +160,23 @@ struct ActivityController: RouteCollection {
     func featureCollectionForUser(req: Request) async throws -> FeatureCollection {
         let user = try req.auth.require(User.self)
         
-        return try await user.getFeatureCollection(req: req)
+        guard let filter = req.parameters.get("filter") else {
+            return try await user.getFeatureCollection(req: req)
+        }
+
+        req.logger.info("Filter: \(filter)")
+        let regex = #/@(?<lng>\d+.\d+),(?<lat>\d+.\d+),(?<zoom>\d+(.\d+)?)/#
+        guard let match = filter.firstMatch(of: regex) else {
+            throw Abort(.badRequest)
+        }
+        
+        return try await user.getFeatureCollection(
+            req: req,
+            filter: .init(
+                lat: Double(match.lat)!,
+                lng: Double(match.lng)!,
+                zoom: Float(match.zoom)!
+            )
+        )
     }
 }
