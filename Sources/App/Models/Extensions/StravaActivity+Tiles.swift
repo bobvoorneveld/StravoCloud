@@ -14,7 +14,7 @@ extension StravaActivity {
     func getTiles(on db: Database, forced: Bool = false) async throws -> [ActivityTile] {
         if !forced {
             try await $tiles.load(on: db)
-            guard tiles.isEmpty else  {
+            guard tiles.isEmpty else {
                 return tiles
             }
         }
@@ -70,7 +70,15 @@ WHERE
             try await $tiles.query(on: db).delete()
         }
         // Store new tiles
-        try await tiles.map { ActivityTile(activityID: id!, x: $0.x, y: $0.y, z: $0.z) }.create(on: db)
+        try await tiles.map {
+            ActivityTile(
+                activityID: id!,
+                userID: try! user.requireID(),
+                x: $0.x,
+                y: $0.y,
+                z: $0.z
+            )
+        }.create(on: db)
         
         // load the new tiles
         try await $tiles.load(on: db)

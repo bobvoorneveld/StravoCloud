@@ -28,6 +28,12 @@ final class User: Model, Content {
     
     @Children(for: \.$user)
     var activities: [StravaActivity]
+    
+    @Children(for: \.$user)
+    var tiles: [ActivityTile]
+    
+    @Field(key: "geojson_tiles")
+    var geoJSONTiles: String?
 
     init() { }
 

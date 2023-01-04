@@ -15,6 +15,8 @@ extension ActivityTile {
             try await database.schema("activity_tiles")
                 .id()
                 .field("activity_id", .uuid, .required, .references("strava_activities", "id"))
+                .field("user_id", .uuid, .required, .references("users", "id"))
+                .field("geom", .geometricPolygon2D, .required)
                 .field("x", .int, .required)
                 .field("y", .int, .required)
                 .field("z", .int, .required)

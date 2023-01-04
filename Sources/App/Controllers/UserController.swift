@@ -8,31 +8,14 @@
 import Vapor
 
 
-extension User {
-    struct Create: Content {
-        var name: String
-        var email: String
-        var password: String
-        var confirmPassword: String
-    }
-}
-
-extension User.Create: Validatable {
-    static func validations(_ validations: inout Validations) {
-        validations.add("name", as: String.self, is: !.empty)
-        validations.add("email", as: String.self, is: .email)
-        validations.add("password", as: String.self, is: .count(8...))
-    }
-}
-
 struct UserController: RouteCollection {
     func boot(routes: Vapor.RoutesBuilder) throws {
         let users = routes.grouped("users")
         users.post(use: create)
-        users.post("basic", use: basic)
         
         let passwordProtected = users.grouped(User.authenticator())
-        passwordProtected.post("token/login", use: tokenLogin)
+            .grouped(User.guardMiddleware())
+        passwordProtected.grouped("token").post("login", use: tokenLogin)
         
         let authSessionsRoutes = users.grouped(User.sessionAuthenticator())
         authSessionsRoutes.get("login", use: loginHandler)
@@ -40,9 +23,6 @@ struct UserController: RouteCollection {
 
         let credentialsAuthRoutes = authSessionsRoutes.grouped(User.credentialsAuthenticator())
         credentialsAuthRoutes.post("login", use: loginPostHandler)
-
-        let tokenProtected = users.grouped(UserToken.authenticator())
-        tokenProtected.get("me", use: me)
     }
     
     func loginHandler(_ req: Request) -> EventLoopFuture<View> {
@@ -68,6 +48,39 @@ struct UserController: RouteCollection {
         try req.auth.require(User.self)
     }
 
+    struct LoginResponse: Content {
+        let name: String
+        let username: String
+        let token: String
+    }
+    func tokenLogin(req: Request) async throws -> LoginResponse {
+        let user = try req.auth.require(User.self)
+        let token = try user.generateToken()
+        try await token.save(on: req.db)
+        return LoginResponse(name: user.name, username: user.email, token: token.value)
+    }
+}
+
+// MARK: - User create routes
+
+extension User {
+    struct Create: Content {
+        var name: String
+        var email: String
+        var password: String
+        var confirmPassword: String
+    }
+}
+
+extension User.Create: Validatable {
+    static func validations(_ validations: inout Validations) {
+        validations.add("name", as: String.self, is: !.empty)
+        validations.add("email", as: String.self, is: .email)
+        validations.add("password", as: String.self, is: .count(8...))
+    }
+}
+
+extension UserController {
     func create(req: Request) async throws -> User {
         try User.Create.validate(content: req)
         let create = try req.content.decode(User.Create.self)
@@ -81,24 +94,5 @@ struct UserController: RouteCollection {
         )
         try await user.save(on: req.db)
         return user
-    }
-    
-    func tokenLogin(req: Request) async throws -> UserToken {
-        let user = try req.auth.require(User.self)
-        let token = try user.generateToken()
-        try await token.save(on: req.db)
-        return token
-    }
-    
-    struct Basic: Decodable {
-        let email: String
-        let password: String
-    }
-
-    func basic(req: Request) async throws -> String {
-        let basic = try req.content.decode(Basic.self)
-        
-        let token = "\(basic.email):\(basic.password)".base64String()
-        return "Basic \(token)"
     }
 }
