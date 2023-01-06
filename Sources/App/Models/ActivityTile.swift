@@ -11,10 +11,10 @@ import FluentPostGIS
 
 final class ActivityTile: Model, Content {
     static let schema = "activity_tiles"
-
+    
     @ID(key: .id)
     var id: UUID?
-
+    
     @Parent(key: "activity_id")
     var activity: StravaActivity
     
@@ -23,10 +23,10 @@ final class ActivityTile: Model, Content {
     
     @Field(key: "geom")
     var geom: GeometricPolygon2D
-
+    
     @Field(key: "x")
     var x: Int
-
+    
     @Field(key: "y")
     var y: Int
     
@@ -36,9 +36,9 @@ final class ActivityTile: Model, Content {
     var url: String {
         "https://tile.openstreetmap.org/\(z)/\(x)/\(y).png"
     }
-
+    
     init() { }
-
+    
     init(activityID: UUID, userID: UUID, x: Int, y: Int, z: Int) {
         self.$activity.id = activityID
         self.$user.id = userID
@@ -46,11 +46,20 @@ final class ActivityTile: Model, Content {
         self.y = y
         self.z = z
         
-        createGeom()
+        self.geom = createGeom()
     }
-    
-    func createGeom() {
-        self.geom = GeometricPolygon2D(exteriorRing: .init(points: [
+}
+
+protocol TileType {
+    var x: Int { get }
+    var y: Int { get }
+    var z: Int { get }
+}
+extension ActivityTile: TileType {}
+
+extension TileType {
+    func createGeom() -> GeometricPolygon2D {
+        GeometricPolygon2D(exteriorRing: .init(points: [
             tileToGeometricPoint(tileX: x, tileY: y, mapZoom: z),
             tileToGeometricPoint(tileX: x+1, tileY: y, mapZoom: z),
             tileToGeometricPoint(tileX: x+1, tileY: y-1, mapZoom: z),

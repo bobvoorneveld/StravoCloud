@@ -17,6 +17,7 @@ struct ActivityController: RouteCollection {
         activitiesRoutes.get(use: activities)
         activitiesRoutes.get("sync", use: sync)
         activitiesRoutes.get("tiles", use: allTiles)
+        activitiesRoutes.post("tiles", use: newTiles)
 
         let featureCollectionRoutes = activitiesRoutes.grouped("feature-collection")
         featureCollectionRoutes.get(use: featureCollectionForUser)
@@ -46,6 +47,23 @@ extension ActivityController {
         
         return try await json.encodeResponse(status: .ok, headers: headers, for: req)
     }
+    
+    struct PostPolyline: Decodable {
+        let polyline: String
+    }
+    func newTiles(req: Request) async throws -> Response {
+        let user = try req.auth.require(User.self)
+        let postData = try req.content.decode(PostPolyline.self)
+        
+        let geoJSONString = try await user.getGeoJSONTiles(for: postData.polyline, on: req.db)
+        
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/json")
+        
+        return try await geoJSONString.encodeResponse(status: .ok, headers: headers, for: req)
+
+    }
+
 
     struct GetTile: Content {
         let x: Int

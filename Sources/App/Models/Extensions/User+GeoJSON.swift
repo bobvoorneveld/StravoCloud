@@ -11,6 +11,7 @@ import FluentKit
 import Vapor
 import FluentPostGIS
 import FluentSQL
+import Polyline
 
 
 extension User {
@@ -102,10 +103,65 @@ extension User {
                 id = '\(raw: id.uuidString)'
             """).all()
     }
+    
+    func getGeoJSONTiles(for polyline: String, on db: Database) async throws -> String {
+        guard let sql = db as? SQLDatabase else {
+            throw Abort(.internalServerError)
+        }
+        
+        let polyline = Polyline(encodedPolyline: polyline)
+        guard let coordinates = polyline.coordinates else {
+            throw Abort(.badRequest)
+        }
+        
+        let geometryDescription: String
+        
+        if coordinates.count == 1 {
+            geometryDescription = GeometricPoint2D(x: coordinates[0].longitude, y: coordinates[0].latitude).description
+        } else {
+            geometryDescription = GeometricLineString2D(
+                points: coordinates.compactMap {
+                    GeometricPoint2D(x: $0.longitude, y: $0.latitude)
+                }
+            ).description
+        }
+
+        
+        guard let geoJSONRow = try await sql.raw("""
+            WITH
+              -- parameter injection, for convenience
+              zoom(lvl, csize) AS (
+                VALUES ( 14, (2*PI()*6378137)/POW(2, 14) )
+              ),
+
+              line AS (SELECT ST_SubDivide(ST_TRANSFORM(ST_GeomFromEWKT('\(raw: geometryDescription)'), 3857), 64) as geom)
+
+            -- get all covering tile indices for each POI
+            SELECT DISTINCT
+                ST_AsGeoJSON(ST_TRANSFORM(ST_Simplify(ST_Union(grid.geom), 0.001), 4326)) AS geojson
+            FROM
+              zoom as z,
+              line as l,
+            LATERAL ST_SquareGrid(z.csize, l.geom) AS grid
+
+            -- filter for those that actually intersect any of the subdivisions
+            WHERE
+              ST_Intersects(l.geom, grid.geom)
+            ;
+            """).first(decoding: GeoJSONRow.self) else {
+            throw Abort(.internalServerError)
+        }
+        
+        return geoJSONRow.geojson
+    }
 }
 
 struct ActivityFilter {
     let lat: Double
     let lng: Double
     let zoom: Float
+}
+
+struct GeoJSONRow: Decodable {
+    let geojson: String
 }
