@@ -15,7 +15,7 @@ struct ActivityController: RouteCollection {
         let sessionAuth = routes.grouped([User.sessionAuthenticator(), UserToken.authenticator(), User.guardMiddleware()])
         let activitiesRoutes = sessionAuth.grouped("activities")
         activitiesRoutes.get(use: activities)
-        activitiesRoutes.get("sync", use: sync)
+        activitiesRoutes.post("sync", use: sync)
         activitiesRoutes.get("tiles", use: allTiles)
         activitiesRoutes.post("tiles", use: newTiles)
 
@@ -92,10 +92,8 @@ func sync(req: Request) async throws -> Response {
     guard let _ = try await user.$stravaToken.get(on: req.db) else {
         return req.redirect(to: "/strava/authenticate")
     }
-    try await req.queue.dispatch(
-            SyncActivities.self,
-            .init(userID: user.requireID()))
-    return try await "syncing".encodeResponse(for: req)
+    try await user.loadActivities(req: req)
+    return try await "syncing done".encodeResponse(for: req)
 }
 
 func detailedSync(req: Request) async throws -> Response {
