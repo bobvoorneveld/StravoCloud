@@ -92,7 +92,8 @@ func sync(req: Request) async throws -> Response {
     guard let _ = try await user.$stravaToken.get(on: req.db) else {
         return req.redirect(to: "/strava/authenticate")
     }
-    try await user.loadActivities(req: req)
+    let connector = StravaConnector(user: user, client: req.client, db: req.db)
+    try await user.loadActivities(connector: connector, app: req.application)
     return try await "syncing done".encodeResponse(for: req)
 }
 
@@ -108,11 +109,13 @@ func detailedSync(req: Request) async throws -> Response {
         throw Abort(.notFound)
     }
 
+    // TODO: not doing anything with forced atm
     let forced = (try? req.query.get(at: "forced")) ?? false
-    try await req.queue.dispatch(
-        SyncDetailedActivity.self,
-        .init(activityID: activityID, forced: forced)
-    )
+
+    let connector = StravaConnector(user: user, client: req.client, db: req.db)
+
+    try await activity.loadDetails(connector: connector)
+
     return try await "\(forced ? "Forced " : "")syncing activity \(activity.name)".encodeResponse(for: req)
 }
 

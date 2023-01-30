@@ -44,27 +44,33 @@ extension StravaToken {
         let accessToken: String
         let expiresAt: TimeInterval
     }
-    func renewToken(app: Application) async throws {
+    func renewToken(connector: StravaConnector) async throws {
         guard let clientID = Environment.get("STRAVA_CLIENT_ID"), let clientSecret = Environment.get("STRAVA_CLIENT_SECRET") else {
             throw Abort(.preconditionFailed)
         }
 
-        if let expires = expiresAt, expires < Date() {
-            let res = try await app.client.post("https://www.strava.com/oauth/token?client_id=\(clientID)&client_secret=\(clientSecret)&grant_type=refresh_token&refresh_token=\(refreshToken)")
-            
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            
-            let newToken = try res.content.decode(NewAccessTokenResponse.self, using: decoder)
-            
-            accessToken = newToken.accessToken
-            expiresAt = Date(timeIntervalSince1970: newToken.expiresAt)
-            try await update(on: app.db)
-        }
+        let newToken: NewAccessTokenResponse = try await connector.post(path: "oauth/token", query: [
+            "client_id": clientID,
+            "client_secret": clientSecret,
+            "grant_type": "refresh_token",
+            "refresh_token": refreshToken
+        ], withToken: false)
+        
+        accessToken = newToken.accessToken
+        expiresAt = Date(timeIntervalSince1970: newToken.expiresAt)
+        try await update(on: connector.db)
     }
     
-    func getAccessToken(app: Application) async throws -> String {
-        try await renewToken(app: app)
-        return accessToken!
+    func getAccessToken(connector: StravaConnector) async throws -> String {
+        // If the current token doesn't exist or is expired, we have to fetch a new one.
+        if expiresAt == nil || expiresAt! < Date() {
+            try await renewToken(connector: connector)
+        }
+        
+        guard let accessToken else {
+            connector.db.logger.error("Cannot get the accessToken for user: \(user.id!)")
+            throw Abort(.internalServerError)
+        }
+        return accessToken
     }
 }

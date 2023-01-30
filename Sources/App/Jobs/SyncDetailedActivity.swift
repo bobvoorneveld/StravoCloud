@@ -30,43 +30,29 @@ struct SyncDetailedActivity: AsyncJob {
             .first() else {
             throw StravaError.noActivity
         }
+        let connector = StravaConnector(user: activity.user, client: context.application.client, db: context.application.db)
+        try await activity.loadDetails(connector: connector)
+    }
+}
+
+extension StravaActivity {
+    func loadDetails(connector: StravaConnector) async throws {
         
-        guard payload.forced || activity.detailedLine == nil else {
-            context.logger.info("Already fetched, not forced, done")
+        guard detailedLine == nil else {
+            connector.logger.info("Already fetched")
             return
         }
         
-        guard let accessToken = try await activity.user.stravaToken?.getAccessToken(app: context.application) else {
-            throw StravaError.invalidToken
-        }
+        let updatedActivity: SummaryActivity = try await connector.get(path: "api/v3/activities/\(stravaID)", query: nil)
         
-        let response = try await context.application.client.get("https://www.strava.com/api/v3/activities/\(activity.stravaID)") { req in
-                req.headers.bearerAuthorization = BearerAuthorization(token: accessToken)
-            }
+        try await update(with: updatedActivity, on: connector.db)
         
-        if response.status == .tooManyRequests {
-            // go again after 15 minutes
-//            try await context.queue.dispatch(
-//                SyncDetailedActivity.self,
-//                payload,
-//                delayUntil: Date(timeIntervalSinceNow: 60 * 15) // Rate limit of 100 every 15 minutes
-//            )
-            throw StravaError.tooManyRequests
-        }
+        connector.logger.info("Getting the tiles for activity: \(id!)")
+        try await getTiles(on: connector.db, forced: true)
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
-        let newAct = try response.content.decode(SummaryActivity.self, using: decoder)
-        
-        try await activity.update(with: newAct, on: context.application.db)
-        
-        context.logger.info("Getting the tiles for activity: \(payload.activityID)")
-        try await activity.getTiles(on: context.application.db, forced: true)
+        connector.logger.info("Getting the counties for activity: \(id!)")
+        try await getCounties(on: connector.db, forced: true)
 
-        context.logger.info("Getting the counties for activity: \(payload.activityID)")
-        try await activity.getCounties(on: context.application.db, forced: true)
-
-        context.logger.info("Details saved of activity: \(payload.activityID)")
+        connector.logger.info("Details saved of activity: \(id!)")
     }
 }
